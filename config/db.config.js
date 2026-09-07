@@ -7,12 +7,15 @@ module.exports = {
     PASSWORD: process.env.MYSQL_PASS,
     DB: process.env.MYSQL_DB,
     DIALECT: "mysql",
-    dialectModule: require('mysql2'), 
+    dialectModule: require('mysql2'),
     OPTIONS: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000,
+      connectTimeout: 5000, // Timeout 5 detik (sesuai Vercel Hobby 10s limit)
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 5000, // Turunkan dari 30000 agar tidak melebihi timeout
+        idle: 10000,
+      },
     },
     LOGGING: process.env.NODE_ENV === "development" ? console.log : false,
   },

@@ -4,8 +4,8 @@
   "description": "To make it easy for you to get started with GitLab, here's a list of recommended next steps.",
   "main": "app.js",
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "dev": "nodemon ./bin/www",
+    "start": "node ./bin/www"
   },
   "repository": {
     "type": "git",
