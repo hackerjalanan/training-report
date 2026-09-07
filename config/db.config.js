@@ -11,7 +11,7 @@ module.exports = {
     OPTIONS: {
       connectTimeout: 5000, // Timeout 5 detik (sesuai Vercel Hobby 10s limit)
       pool: {
-        max: 5,
+        max: 10,
         min: 0,
         acquire: 5000, // Turunkan dari 30000 agar tidak melebihi timeout
         idle: 10000,
