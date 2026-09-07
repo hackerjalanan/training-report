@@ -8,9 +8,10 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USERNAME, dbConfig.PASSWOR
   host: dbConfig.HOST,
   port: dbConfig.PORT,
   dialect: dbConfig.DIALECT,
+  dialectModule: require("mysql2"),   // <-- baris baru, WAJIB ada
   pool: dbConfig.OPTIONS,
   logging: (msg) => !msg.includes("SELECT 1+1 AS result") && console.log(msg),
-});
+}); 
 
 // Attempt database connection with retries coba
 const connectWithRetry = async (retries = 5, delay = 5000) => {
