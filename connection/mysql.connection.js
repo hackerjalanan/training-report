@@ -12,7 +12,7 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USERNAME, dbConfig.PASSWOR
   logging: (msg) => !msg.includes("SELECT 1+1 AS result") && console.log(msg),
 });
 
-// Attempt database connection with retries
+// Attempt database connection with retries coba
 const connectWithRetry = async (retries = 5, delay = 5000) => {
   for (let i = 0; i < retries; i++) {
     try {
