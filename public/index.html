@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Status</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: linear-gradient(
+          235deg,
+          #d2d0db 25%,
+          #999898 50%,
+          #d2d0db 75%
+        );
+        background-size: 400% 400%; /* Memperbesar gradasi untuk transisi lebih halus */
+        animation: gradientBackground 3s linear infinite; /* Durasi animasi lebih lama untuk efek smooth */
+        color: #058d00;
+      }
+
+      .container {
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 2rem;
+        margin: 20px 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .dots {
+        display: inline-block;
+        margin-left: 7px;
+      }
+
+      .dot {
+        font-size: 2rem;
+        animation: blink 1.5s infinite;
+        display: inline-block;
+      }
+
+      .dot:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .dot:nth-child(2) {
+        animation-delay: 0.3s;
+      }
+      .dot:nth-child(3) {
+        animation-delay: 0.6s;
+      }
+
+      @keyframes blink {
+        0% {
+          opacity: 0;
+        }
+        50% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+
+      @keyframes gradientBackground {
+        0% {
+          background-position: 0% 100%; /* Berakhir di kiri bawah */
+        }
+        100% {
+          background-position: 100% 0%; /* Mulai dari kanan atas */
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>
+        Server is Available
+        <span class="dots">
+          <span class="dot">.</span>
+          <span class="dot">.</span>
+          <span class="dot">.</span>
+        </span>
+      </h1>
+    </div>
+  </body>
+</html>
