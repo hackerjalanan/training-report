@@ -1,45 +1,80 @@
+// mysql.connect.js
 const { Sequelize, DataTypes, Op, QueryTypes } = require("sequelize");
-const dbConfig = require("../config/db.config")["mysql"];
+const dbConfig = require("../config/db.config")["postgres"];
 const fs = require("fs");
 const path = require("path");
 
-// Initialize Sequelize
-const sequelize = new Sequelize(dbConfig.DB, dbConfig.USERNAME, dbConfig.PASSWORD, {
-  host: dbConfig.HOST,
-  port: dbConfig.PORT,
-  dialect: dbConfig.DIALECT,
-  dialectModule: require("mysql2"),   // <-- baris baru, WAJIB ada
-  pool: dbConfig.OPTIONS,
-  logging: (msg) => !msg.includes("SELECT 1+1 AS result") && console.log(msg),
-}); 
+// Initialize Sequelize (Singleton Pattern - WAJIB untuk Vercel Serverless)
+if (!global.sequelizeInstance) {
+  global.sequelizeInstance = new Sequelize(
+  dbConfig.DB,
+  dbConfig.USERNAME,
+  dbConfig.PASSWORD,
+  {
+    host: dbConfig.HOST,
+    port: dbConfig.PORT,
+    dialect: dbConfig.DIALECT,
+    dialectModule: dbConfig.dialectModule,
 
-// Attempt database connection with retries coba
-const connectWithRetry = async (retries = 5, delay = 5000) => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      await sequelize.authenticate();
-      console.log("Connected to MySQL!");
-      return;
-    } catch (err) {
-      console.error(`Attempt ${i + 1}: Retrying in ${delay / 1000}s...`);
-      await new Promise((res) => setTimeout(res, delay));
-    }
+    dialectOptions: {
+      ssl: dbConfig.OPTIONS.ssl,
+      connectTimeout: dbConfig.OPTIONS.connectTimeout,
+    },
+
+    pool: dbConfig.OPTIONS.pool,
+    logging: dbConfig.LOGGING,
+
+    retry: {
+      match: [
+        /ETIMEDOUT/,
+        /EHOSTUNREACH/,
+        /ECONNRESET/,
+        /ECONNREFUSED/,
+        /ESOCKETTIMEDOUT/,
+        /EPIPE/,
+        /EAI_AGAIN/,
+        /ENETUNREACH/, 
+        /SequelizeConnectionError/,
+        /SequelizeConnectionRefusedError/,
+        /SequelizeHostNotFoundError/,
+        /SequelizeHostNotReachableError/,
+        /SequelizeInvalidConnectionError/,
+        /SequelizeConnectionTimedOutError/,
+      ],
+      max: 3,
+    },
   }
-  console.error("Failed to connect after multiple attempts.");
-  throw new Error("Database connection failed");
+);
 
-};
-connectWithRetry();
+  // Cleanup pool saat aplikasi dimatikan
+  const shutdown = async () => {
+    try {
+      await global.sequelizeInstance.close();
+      console.log('PostgreSQL connection pool closed.');
+    } catch (err) {
+      console.error('Error closing PostgreSQL pool:', err);
+    }
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown); 
+}
+
+const sequelize = global.sequelizeInstance;
 
 // Load models dynamically
 const db = { sequelize, Sequelize, Op, QueryTypes };
 const modelsFolder = path.join(__dirname, "../src/model");
-fs.readdirSync(modelsFolder)
-  .filter((file) => file.endsWith(".js"))
-  .forEach((file) => {
-    const model = require(path.join(modelsFolder, file))(sequelize, DataTypes);
-    db[model.name] = model;
-  });
+if (fs.existsSync(modelsFolder)) { 
+  fs.readdirSync(modelsFolder)
+    .filter((file) => file.endsWith(".js"))
+    .forEach((file) => {
+      const model = require(path.join(modelsFolder, file))(sequelize, DataTypes);
+      db[model.name] = model;
+    });
+} else {
+  console.error(`❌ Models folder tidak ditemukan: ${modelsFolder}`);
+}
 
 // Initialize associations
 Object.values(db).forEach((model) => model.associate?.(db));
