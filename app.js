@@ -12,7 +12,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:4000",
-  "https://fe-training-gii.vercel.app/",
+  "https://fe-training-gii.vercel.app",
 ];
 
 const corsOptions = {
