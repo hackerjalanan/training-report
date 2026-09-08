@@ -15,12 +15,17 @@ const allowedOrigins = [
   "https://fe-training-gii.vercel.app",
 ];
 
+
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/fe-training-gii-.*\.vercel\.app$/.test(origin) // izinkan semua preview deploy
+    ) {
       callback(null, true);
     } else {
-      callback(null, false); // tolak tanpa throw error
+      callback(null, false);
     }
   },
   credentials: true,
