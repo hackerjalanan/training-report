@@ -109,14 +109,11 @@ const update = async (req) => {
   
       // commit transaction
       await transaction.commit();
-  
       return payload;  
 
   } catch (error) {
     
-      // rollback transaction
       await transaction.rollback();
-
       throw error;
   }
 };
@@ -124,26 +121,19 @@ const update = async (req) => {
 // 4. delete (soft-delete)
 const softDelete = async (req) => {
   const dataId = req.params.staff_id;
-
-   // set transaction
    const transaction = await db.sequelize.transaction();
 
   try {
-      // get data 'modified_at' and 'modified_by'
       const { currentDatetime } = getMetadataInfo(req);
-  
       const payload = {
           status_deleted: 0,
           updated_at: currentDatetime,
       };
-  
-      // update data by 'account_id'
+      
       await staffRepo.update(payload, { staff_id: dataId }, transaction);
-  
-      // commit transaction
       await transaction.commit();
-
       return payload;    
+
   } catch (error) {
     throw new InvalidParameterError("Gagal delete akun: " + error.message);
   }

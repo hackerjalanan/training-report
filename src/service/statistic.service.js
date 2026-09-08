@@ -1,44 +1,44 @@
 // statistic.service.js
 
-
 const statcRepository = require("../repository/statistic.repository");
-const { NotFoundError } = require("../../error/not-found.error");
 
+const defaultStats = {
+  total: 0,
+  selesai: 0,
+  belum_selesai: 0,
+  progress_percent: "0%",
+  statusBreakdown: [],
+  schedule_report_summary: { total_schedule: 0, with_report: 0, without_report: 0 },
+  trainer_report_stats: [],
+  program_summary: []
+};
 
 const fetchStatc = async () => {
   try {
-    const data = await statcRepository.getGlobalReportStatistics();
-    return data;
+    return await statcRepository.getGlobalReportStatistics();
   } catch (error) {
-    console.error("Error in statistic.service.js > fetchStatc:", error);
-    throw new NotFoundError("Data statistik tidak ditemukan");
+    console.error("Error in fetchStatc:", error);
+    return defaultStats;
   }
 };
 
-
 const fetchStatcByTraining = async () => {
   try {
-    const data = await statcRepository.getDetailedProgressByTraining();
-    return data;
+    return await statcRepository.getDetailedProgressByTraining();
   } catch (error) {
-    console.error("Error in statistic.service.js > fetchStatcByTraining:", error);
-    throw new NotFoundError("Statistik per training tidak ditemukan");
+    console.error("Error in fetchStatcByTraining:", error);
+    return [];
   }
 };
 
 const totalPersen = async (req) => {
-    const {startDate, endDate} = req.body
   try {
-    const data = await statcRepository.getGlobalReportStatistics(startDate, endDate);
-    return data;
+    const { startDate, endDate } = req.body;
+    return await statcRepository.getGlobalReportStatistics(startDate, endDate);
   } catch (error) {
-    console.error("Error in statistic.service.js > fetchStatcByTraining:", error);
-    throw new NotFoundError("Statistik per training tidak ditemukan");
+    console.error("Error in totalPersen:", error);
+    return defaultStats;
   }
 };
 
-module.exports = {
-  fetchStatc,
-  fetchStatcByTraining,
-  totalPersen,
-};
+module.exports = { fetchStatc, fetchStatcByTraining, totalPersen };
