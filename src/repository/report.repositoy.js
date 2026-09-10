@@ -602,8 +602,8 @@ const findById = async (report_id) => {
 };
 
 module.exports = {
-  findAll,
   findStaffByRoles,
+  findAll,
   count,
   create,
   update,

@@ -36,7 +36,7 @@ const showAll = async (req, res, next) => {
 
     return successResponse(res, {
       ...data,
-      permissions, // ← tambahkan ini
+      permissions, 
     }, {
       message: "Menampilkan data staff.",
       code: 200,

@@ -63,108 +63,498 @@ async function getDetailedProgressByTraining() {
   return results;
 }
 
-
 async function getGlobalReportStatistics(startDate = null, endDate = null) {
-  const trainingDateFilter = { status_deleted: 1 };
-  if (startDate && endDate) {
-    trainingDateFilter.start_date = { [Op.gte]: startDate };
-    trainingDateFilter.end_date = { [Op.lte]: endDate };
+  try {
+    const whereReport = {
+      status_delete: 1,
+    };
+
+    const whereSesi = {
+      status_deleted: 1,
+    };
+
+    if (startDate && endDate) {
+      whereSesi.start_date = {
+        [Op.gte]: startDate,
+      };
+
+      whereSesi.end_date = {
+        [Op.lte]: endDate,
+      };
+    }
+
+    // =====================================================
+    // TOTAL REPORT
+    // =====================================================
+
+    const totalReports = await report.count({
+      where: whereReport,
+      include: [
+        {
+          model: training_sesi,
+          as: "training_sesis",
+          attributes: [],
+          where: whereSesi,
+          required: true,
+        },
+      ],
+      distinct: true,
+      col: "report_id",
+    });
+
+    // =====================================================
+    // STATUS BREAKDOWN
+    // =====================================================
+
+    const statusBreakdown = await report.findAll({
+      attributes: [
+        "status_acc",
+        "acc_director_status",
+        [fn("COUNT", col("report.report_id")), "count"],
+      ],
+
+      where: whereReport,
+
+      include: [
+        {
+          model: training_sesi,
+          as: "training_sesis",
+          attributes: [],
+          where: whereSesi,
+          required: true,
+        },
+      ],
+
+      group: [
+        "report.status_acc",
+        "report.acc_director_status",
+      ],
+
+      raw: true,
+    });
+
+    console.log("TOTAL REPORT:", totalReports);
+
+    console.log(
+      "STATUS BREAKDOWN:",
+      JSON.stringify(statusBreakdown, null, 2)
+    );
+
+    // =====================================================
+    // SELESAI
+    // =====================================================
+
+    const selesaiCount = statusBreakdown.reduce(
+      (sum, item) => {
+        const statusAcc = String(
+          item.status_acc ?? ""
+        ).toLowerCase();
+
+        const directorStatus = String(
+          item.acc_director_status ?? ""
+        ).toLowerCase();
+
+        // Support status text dan numeric
+        const accApproved =
+          statusAcc === "disetujui" ||
+          statusAcc === "approved" ||
+          statusAcc === "2";
+
+        const directorApproved =
+          directorStatus === "disetujui" ||
+          directorStatus === "approved" ||
+          directorStatus === "2";
+
+        if (
+          accApproved &&
+          directorApproved
+        ) {
+          return sum + Number(item.count || 0);
+        }
+
+        return sum;
+      },
+      0
+    );
+
+    const belumSelesai =
+      totalReports - selesaiCount;
+
+    const progressPercent =
+      totalReports > 0
+        ? `${Math.round(
+            (selesaiCount / totalReports) * 100
+          )}%`
+        : "0%";
+
+    // =====================================================
+    // REPORT SCHEDULE
+    // =====================================================
+
+    const allSchedules = await report_schedule.findAll({
+      attributes: [
+        "report_schedule_id",
+        "training_sesi_id",
+      ],
+
+      include: [
+        {
+          model: training_sesi,
+          as: "training_sesi",
+          attributes: [
+            "training_sesi_id",
+            "program_training_id",
+            "staff_id",
+            "start_date",
+            "end_date",
+          ],
+          where: whereSesi,
+          required: true,
+
+          include: [
+            {
+              model: program_training,
+              as: "program_training",
+              attributes: [
+                "program_training_id",
+                "name",
+              ],
+              required: false,
+            },
+          ],
+        },
+      ],
+
+      raw: true,
+    });
+
+    const allScheduleIds =
+      allSchedules
+        .map(
+          (item) =>
+            item.report_schedule_id
+        )
+        .filter(Boolean);
+
+    // =====================================================
+    // REPORT YANG SUDAH ADA
+    // =====================================================
+
+    const existingReports =
+      allScheduleIds.length > 0
+        ? await report.findAll({
+            where: {
+              report_schedule_id: {
+                [Op.in]: allScheduleIds,
+              },
+              status_delete: 1,
+            },
+
+            attributes: [
+              "report_id",
+              "report_schedule_id",
+              "staff_id",
+            ],
+
+            raw: true,
+          })
+        : [];
+
+    const reportedScheduleIds =
+      new Set(
+        existingReports.map(
+          (item) =>
+            item.report_schedule_id
+        )
+      );
+
+    // =====================================================
+    // SCHEDULE PER STAFF
+    // =====================================================
+
+    const scheduleByStaff =
+      allScheduleIds.length > 0
+        ? await report_schedule.findAll({
+            where: {
+              report_schedule_id: {
+                [Op.in]: allScheduleIds,
+              },
+            },
+
+            attributes: [
+              "report_schedule_id",
+              "training_sesi_id",
+            ],
+
+            include: [
+              {
+                model: training_sesi,
+                as: "training_sesi",
+                attributes: [
+                  "staff_id",
+                ],
+                where: whereSesi,
+                required: true,
+              },
+            ],
+
+            raw: true,
+          })
+        : [];
+
+    // =====================================================
+    // REPORT PER STAFF
+    // =====================================================
+
+    const reportPerStaff =
+      allScheduleIds.length > 0
+        ? await report.findAll({
+            where: {
+              report_schedule_id: {
+                [Op.in]: allScheduleIds,
+              },
+              status_delete: 1,
+            },
+
+            attributes: [
+              "report_id",
+              "staff_id",
+              "report_schedule_id",
+            ],
+
+            include: [
+              {
+                model: staff,
+                as: "staff",
+                attributes: [
+                  "staff_id",
+                  "name",
+                ],
+                required: false,
+              },
+            ],
+
+            raw: true,
+          })
+        : [];
+
+    // =====================================================
+    // REPORT COUNT PER STAFF
+    // =====================================================
+
+    const reportCountByStaff = {};
+
+    for (const item of reportPerStaff) {
+      if (!item.staff_id) continue;
+
+      if (!reportCountByStaff[item.staff_id]) {
+        reportCountByStaff[item.staff_id] = {
+          staff_id: item.staff_id,
+          name:
+            item["staff.name"] ||
+            "(Tidak dikenal)",
+          report_count: 0,
+        };
+      }
+
+      reportCountByStaff[
+        item.staff_id
+      ].report_count++;
+    }
+
+    // =====================================================
+    // SCHEDULE COUNT PER STAFF
+    // =====================================================
+
+    const scheduleCountByStaff = {};
+
+    for (const item of scheduleByStaff) {
+      const staffId =
+        item["training_sesi.staff_id"];
+
+      if (!staffId) continue;
+
+      scheduleCountByStaff[staffId] =
+        (scheduleCountByStaff[staffId] || 0) + 1;
+    }
+
+    // =====================================================
+    // TRAINER STATS
+    // =====================================================
+
+    const trainerStats =
+      Object.entries(
+        scheduleCountByStaff
+      ).map(
+        ([staffId, totalSchedule]) => {
+          const info =
+            reportCountByStaff[
+              staffId
+            ] || {
+              name: "(Tidak dikenal)",
+              report_count: 0,
+            };
+
+          const reported =
+            info.report_count;
+
+          const percent =
+            totalSchedule > 0
+              ? Math.round(
+                  (reported /
+                    totalSchedule) *
+                    100
+                )
+              : 0;
+
+          return {
+            staff_id: staffId,
+            name: info.name,
+            reported,
+            total_schedule:
+              totalSchedule,
+            ratio: `${reported}/${totalSchedule}`,
+            percent: `${percent}%`,
+          };
+        }
+      );
+
+    // =====================================================
+    // MEETING COUNT
+    // =====================================================
+
+    const sesiCounts =
+      await meeting.findAll({
+        attributes: [
+          "training_sesi_id",
+          [
+            fn(
+              "COUNT",
+              col("meeting_id")
+            ),
+            "total_sesi",
+          ],
+        ],
+
+        include: [
+          {
+            model: training_sesi,
+            as: "training_sesi",
+            attributes: [],
+            where: whereSesi,
+            required: true,
+          },
+        ],
+
+        group: [
+          "meeting.training_sesi_id",
+        ],
+
+        raw: true,
+      });
+
+    const sesiCountMap = {};
+
+    for (const item of sesiCounts) {
+      sesiCountMap[
+        item.training_sesi_id
+      ] = Number(
+        item.total_sesi || 0
+      );
+    }
+
+    // =====================================================
+    // PROGRAM SUMMARY
+    // =====================================================
+
+    const programMap = {};
+
+    for (const item of allSchedules) {
+      const sesiId =
+        item[
+          "training_sesi.training_sesi_id"
+        ];
+
+      const programName =
+        item[
+          "training_sesi.program_training.name"
+        ] || "Tidak diketahui";
+
+      if (!programMap[programName]) {
+        programMap[programName] = {
+          program: programName,
+          jumlah_kelas: new Set(),
+          total_sesi: 0,
+        };
+      }
+
+      if (sesiId) {
+        programMap[
+          programName
+        ].jumlah_kelas.add(sesiId);
+
+        programMap[
+          programName
+        ].total_sesi +=
+          sesiCountMap[sesiId] || 0;
+      }
+    }
+
+    const program_summary =
+      Object.values(programMap).map(
+        (item) => ({
+          program: item.program,
+          jumlah_kelas:
+            item.jumlah_kelas.size,
+          total_sesi:
+            item.total_sesi,
+        })
+      );
+
+    // =====================================================
+    // FINAL RESPONSE
+    // =====================================================
+
+    return {
+      total: totalReports,
+
+      selesai: selesaiCount,
+
+      belum_selesai: belumSelesai,
+
+      progress_percent:
+        progressPercent,
+
+      statusBreakdown,
+
+      schedule_report_summary: {
+        total_schedule:
+          allScheduleIds.length,
+
+        with_report:
+          reportedScheduleIds.size,
+
+        without_report:
+          Math.max(
+            allScheduleIds.length -
+              reportedScheduleIds.size,
+            0
+          ),
+      },
+
+      trainer_report_stats:
+        trainerStats,
+
+      program_summary,
+    };
+  } catch (error) {
+    console.error(
+      "Error getGlobalReportStatistics:",
+      error
+    );
+
+    throw error;
   }
-
-  const statusBreakdown = await report.findAll({
-    attributes: ['status_acc', 'acc_director_status', [fn('COUNT', col('*')), 'count']],
-    include: [{ model: training_sesi, as: 'training_sesis', attributes: [], where: trainingDateFilter, required: true }],
-    where: { status_delete: 1 },
-    group: ['status_acc', 'acc_director_status'],
-    raw: true
-  });
-
-  const totalReports = statusBreakdown.reduce((sum, item) => sum + parseInt(item.count), 0);
-  const selesaiCount = statusBreakdown.reduce((sum, item) =>
-    (item.status_acc === 'disetujui' && item.acc_director_status === 'disetujui') ? sum + parseInt(item.count) : sum, 0);
-  const progressPercent = totalReports > 0 ? `${Math.round((selesaiCount / totalReports) * 100)}%` : '0%';
-
-  const allSchedules = await report_schedule.findAll({
-    include: [{
-      model: training_sesi,
-      as: 'training_sesi',
-      attributes: ['training_sesi_id', 'program_training_id', 'staff_id', 'start_date', 'end_date'],
-      where: trainingDateFilter,
-      include: [{ model: program_training, as: 'program_training', attributes: ['name'], required: false }],
-      required: true
-    }],
-    attributes: ['report_schedule_id'],
-    raw: true
-  });
-
-  const allScheduleIds = allSchedules.map(s => s.report_schedule_id);
-
-  const [existingReports, scheduleByStaff, sesiCounts, reportPerStaff] = await Promise.all([
-    report.findAll({ where: { report_schedule_id: { [Op.in]: allScheduleIds }, status_delete: 1 }, attributes: ['report_schedule_id'], raw: true }),
-    report_schedule.findAll({
-      where: { report_schedule_id: { [Op.in]: allScheduleIds } },
-      include: [{ model: training_sesi, as: 'training_sesi', attributes: ['staff_id'], where: trainingDateFilter, required: true }],
-      attributes: ['report_schedule_id'], raw: true
-    }),
-    meeting.findAll({
-      include: [{ model: training_sesi, as: 'training_sesi', attributes: [], where: trainingDateFilter, required: true }],
-      attributes: ['training_sesi_id', [fn('COUNT', col('meeting_id')), 'total_sesi']],
-      group: ['training_sesi_id'], raw: true
-    }),
-    report.findAll({
-      where: { report_schedule_id: { [Op.in]: allScheduleIds }, status_delete: 1 },
-      include: [{ model: staff, as: 'staff', attributes: ['staff_id', 'name'], required: true }],
-      attributes: ['staff_id', 'report_schedule_id'], raw: true
-    })
-  ]);
-
-  const reportedScheduleIds = new Set(existingReports.map(r => r.report_schedule_id));
-
-  const reportCountByStaff = {};
-  for (const r of reportPerStaff) {
-    const staffId = r.staff_id;
-    const name = r['staff.name'];
-    if (!reportCountByStaff[staffId]) reportCountByStaff[staffId] = { staff_id: staffId, name, report_count: 0 };
-    reportCountByStaff[staffId].report_count++;
-  }
-
-  const scheduleCountByStaff = {};
-  for (const s of scheduleByStaff) {
-    const staffId = s['training_sesi.staff_id'];
-    scheduleCountByStaff[staffId] = (scheduleCountByStaff[staffId] || 0) + 1;
-  }
-
-  const trainerStats = Object.entries(scheduleCountByStaff).map(([staffId, totalSchedule]) => {
-    const reportInfo = reportCountByStaff[staffId] || { report_count: 0, name: '(Tidak dikenal)' };
-    const reported = reportInfo.report_count;
-    const percentage = totalSchedule > 0 ? Math.round((reported / totalSchedule) * 100) : 0;
-    return { staff_id: staffId, name: reportInfo.name, reported, total_schedule: totalSchedule, ratio: `${reported}/${totalSchedule}`, percent: `${percentage}%` };
-  });
-
-  const programSesiInfo = {};
-  for (const s of allSchedules) {
-    const sesi = sesiCounts.find(m => m.training_sesi_id === s['training_sesi.training_sesi_id']);
-    const trainingId = s['training_sesi.training_sesi_id'];
-    const programName = s['training_sesi.program_training.name'] || 'Tidak diketahui';
-    if (!programSesiInfo[programName]) programSesiInfo[programName] = { program: programName, total_sesi: 0, jumlah_kelas: new Set() };
-    programSesiInfo[programName].jumlah_kelas.add(trainingId);
-    programSesiInfo[programName].total_sesi += sesi ? parseInt(sesi.total_sesi) : 0;
-  }
-
-  const program_summary = Object.values(programSesiInfo).map(p => ({
-    program: p.program, jumlah_kelas: p.jumlah_kelas.size, total_sesi: p.total_sesi
-  }));
-
-  return {
-    total: totalReports,
-    selesai: selesaiCount,
-    belum_selesai: totalReports - selesaiCount,
-    progress_percent: progressPercent,
-    statusBreakdown,
-    schedule_report_summary: { total_schedule: allScheduleIds.length, with_report: reportedScheduleIds.size, without_report: allScheduleIds.length - reportedScheduleIds.size },
-    trainer_report_stats: trainerStats,
-    program_summary
-  };
 }
 
 module.exports = { calculateReportProgress, getDetailedProgressByTraining, getGlobalReportStatistics };

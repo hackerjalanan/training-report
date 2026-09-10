@@ -41,7 +41,7 @@ const gGrafik= `grafik/${v1}`;
 router.get(`/${gGrafik}/training`, validationAllRole, reportDashboard.fetchTrainingGraph);
 
 //statsc
-const gStatc = `statc/${v1}`; // kamu bisa ubah ini sesuai dengan kebutuhan path utama
+const gStatc = `statc/${v1}`; 
 router.get(`/${gStatc}/training`, validationAllRole, statscController.getStatc);
 router.get(`/${gStatc}/trainer`, validationAllRole, statscController.getStatcByTraining);
 router.post(`/${gStatc}/total-report`, validationAllRole, statscController.totalPersen);
